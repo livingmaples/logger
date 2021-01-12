@@ -33,7 +33,7 @@ type Collector interface {
 }
 
 type OutputFormatter interface {
-	Format(context.Context, *map[string]interface{}) ([]byte, error)
+	Format(context.Context, string, map[string]string) ([]byte, error)
 }
 
 type Event interface {
@@ -80,6 +80,10 @@ func New(ctx context.Context, logger *Logger) error {
 	logInstance.ctx = ctx
 
 	// Add default fatal and panic events to events list
+	if logInstance.Event == nil {
+		logInstance.Event = make(map[LogLevel][]Event)
+	}
+
 	logInstance.Event[FatalLevel] = append(logInstance.Event[FatalLevel], FatalEvent{})
 	logInstance.Event[PanicLevel] = append(logInstance.Event[PanicLevel], PanicEvent{})
 
@@ -150,8 +154,8 @@ func (l *Logger) handle(ctx context.Context, msg string) error {
 		return err
 	}
 
-	r, err := l.formatter().Format(ctx, mergeDefaultsToOutput(&map[string]interface{}{
-		"time":  time.Now(),
+	r, err := l.formatter().Format(ctx, l.Level.Label(), mergeDefaultsToOutput(map[string]string{
+		"time":  time.Now().String(),
 		"level": l.Level.Label(),
 		"msg":   msg,
 	}, l.Defaults))

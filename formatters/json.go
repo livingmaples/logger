@@ -9,7 +9,7 @@ type JsonFormatter struct {
 	Timestamp bool
 }
 
-func (f JsonFormatter) Format(ctx context.Context, data *map[string]interface{}) ([]byte, error) {
+func (f JsonFormatter) Format(ctx context.Context, level string, data map[string]string) ([]byte, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

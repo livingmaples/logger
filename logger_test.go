@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestWrite(t *testing.T) {
+func TestJsonFormatter(t *testing.T) {
 	New(context.TODO(), &Logger{
-		Level: FatalLevel,
+		Level: TraceLevel,
 		Defaults: map[string]interface{}{
 			"foo": "bar",
 			"moo": "goo",
@@ -18,5 +18,19 @@ func TestWrite(t *testing.T) {
 		Formatter: formatters.JsonFormatter{},
 	})
 
-	Fatal("Test logging")
+	Debug("Test logging in json formatter")
+}
+
+func TestTextFormatter(t *testing.T) {
+	New(context.TODO(), &Logger{
+		Level: TraceLevel,
+		Defaults: map[string]interface{}{
+			"foo": "bar",
+			"moo": "goo",
+		},
+		Collector: []Collector{collectors.StderrCollector{}},
+		Formatter: formatters.TextFormatter{},
+	})
+
+	Debug("Test logging in text formatter")
 }
