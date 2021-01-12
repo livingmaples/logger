@@ -37,7 +37,7 @@ type OutputFormatter interface {
 }
 
 type Event interface {
-	Fire(context.Context, *string, *map[string]interface{})
+	Fire(context.Context, string, map[string]interface{})
 }
 
 type Logger struct {
@@ -79,7 +79,9 @@ func New(ctx context.Context, logger *Logger) error {
 	logInstance = logger
 	logInstance.ctx = ctx
 
-	// Add exit event for Fatal level
+	// Add default fatal and panic events to events list
+	logInstance.Event[FatalLevel] = append(logInstance.Event[FatalLevel], FatalEvent{})
+	logInstance.Event[PanicLevel] = append(logInstance.Event[PanicLevel], PanicEvent{})
 
 	// currently New only returns nil but in the future we may check some conditions
 	return nil
@@ -102,7 +104,17 @@ func (l *Logger) SetFormatter(f OutputFormatter) {
 }
 
 func (l *Logger) SetEvent(level LogLevel, event Event) {
+	// If the new event is for FatalLevel or PanicLevel,
+	// we must make sure that default events keep at the end of the list
+	if level == FatalLevel || level == PanicLevel {
+		index := len(l.Event[level]) - 1
+		l.Event[level] = append(l.Event[level][:index+1], l.Event[level][index:]...)
+		l.Event[level][index] = event
+		return
+	}
+
 	l.Event[level] = append(l.Event[level], event)
+
 }
 
 func (l *Logger) log(level LogLevel, msg string) error {
@@ -184,7 +196,7 @@ func (l *Logger) triggerEvents(ctx context.Context, msg string) {
 		return
 	default:
 		for _, event := range l.Event[l.Level] {
-			event.Fire(ctx, &msg, &l.Defaults)
+			event.Fire(ctx, msg, l.Defaults)
 		}
 	}
 }
@@ -201,7 +213,10 @@ func DebugF(format string, args ...interface{}) { logInstance.log(DebugLevel, fm
 func Error(v ...interface{})                    { logInstance.log(ErrorLevel, fmt.Sprint(v...)) }
 func ErrorF(format string, args ...interface{}) { logInstance.log(ErrorLevel, fmt.Sprintf(format, args...)) }
 
-func Fatal(v ...interface{})                    { logInstance.log(FatalLevel, fmt.Sprint(v...)) }
+// Fatal log message and run os.Exit
+func Fatal(v ...interface{}) { logInstance.log(FatalLevel, fmt.Sprint(v...)) }
+
+// FatalF log message and run os.Exit
 func FatalF(format string, args ...interface{}) { logInstance.log(FatalLevel, fmt.Sprintf(format, args...)) }
 
 func Panic(v ...interface{})                    { logInstance.log(PanicLevel, fmt.Sprint(v...)) }
