@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"log"
 	"os"
 )
@@ -9,11 +8,12 @@ import (
 type StderrCollector struct {
 }
 
-func (c StderrCollector) Ping(ctx context.Context) bool {
-	return true
+func (c StderrCollector) Ping() (bool, error) {
+	return true, nil
 }
 
-func (c StderrCollector) Write(ctx context.Context, data []byte) {
+func (c StderrCollector) Write(data *[]byte) {
 	log.SetOutput(os.Stderr)
-	log.Print(string(data))
+	log.SetFlags(0)
+	log.Print(string(*data))
 }
