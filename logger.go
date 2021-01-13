@@ -1,8 +1,8 @@
 package logger
 
 import (
-	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -28,16 +28,16 @@ const (
 var logInstance *Logger
 
 type Collector interface {
-	Ping(context.Context) bool
-	Write(context.Context, []byte)
+	Ping() (bool, error)
+	Write(*[]byte)
 }
 
 type OutputFormatter interface {
-	Format(context.Context, string, map[string]string) ([]byte, error)
+	Format(string, map[string]string) ([]byte, error)
 }
 
 type Event interface {
-	Fire(context.Context, string, map[string]interface{})
+	Fire(string, map[string]interface{})
 }
 
 type Logger struct {
@@ -46,10 +46,9 @@ type Logger struct {
 	Collector  []Collector
 	Formatter  OutputFormatter
 	Event      map[LogLevel][]Event
-	EventChain bool // If true, events at the same level will run only if the previous event returns true.
-	Timeout    time.Duration
 	Lock       bool // Not used yet
-	ctx        context.Context
+	SilentMode bool // if true, the verbose mode will disabled
+	mu         sync.Mutex
 }
 
 func (level LogLevel) Label() string {
@@ -74,11 +73,8 @@ func (level LogLevel) Label() string {
 }
 
 // New initialize logger with given data
-// Please note that, never pass a timeout context instead set Timeout.
-func New(ctx context.Context, logger *Logger) error {
+func New(logger *Logger) error {
 	logInstance = logger
-	logInstance.ctx = ctx
-
 	// Add default fatal and panic events to events list
 	if logInstance.Event == nil {
 		logInstance.Event = make(map[LogLevel][]Event)
@@ -126,35 +122,20 @@ func (l *Logger) log(level LogLevel, msg string) error {
 		return nil
 	}
 
-	// If Timeout passed to the logger initializer we can make a timeout context and pass it to the `handler` function.
-	if l.Timeout.Seconds() > 0 {
-		ctx, cnl := context.WithTimeout(l.ctx, l.Timeout)
-		defer cnl()
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("log preparing canceled because: %s", l.ctx.Err())
-		default:
-			return l.handle(ctx, msg)
-		}
-	}
-
-	select {
-	case <-l.ctx.Done():
-		return fmt.Errorf("log preparing canceled because: %s", l.ctx.Err())
-	default:
-		return l.handle(l.ctx, msg)
-	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.handle(msg)
 }
 
 // handle don't use Logger ctx directly instead uses context passed from log function
-func (l *Logger) handle(ctx context.Context, msg string) error {
-	c, err := l.collector(ctx)
+func (l *Logger) handle(msg string) error {
+	c, err := l.collector()
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 
-	r, err := l.formatter().Format(ctx, l.Level.Label(), mergeDefaultsToOutput(map[string]string{
+	r, err := l.formatter().Format(l.Level.Label(), mergeDefaultsToOutput(map[string]string{
 		"time":  time.Now().String(),
 		"level": l.Level.Label(),
 		"msg":   msg,
@@ -163,8 +144,8 @@ func (l *Logger) handle(ctx context.Context, msg string) error {
 		return err
 	}
 
-	c.Write(ctx, r)
-	l.triggerEvents(ctx, msg)
+	c.Write(&r)
+	l.triggerEvents(msg)
 
 	return nil
 }
@@ -178,11 +159,17 @@ func (l *Logger) formatter() OutputFormatter {
 }
 
 // collector returns first available log collector
-func (l *Logger) collector(ctx context.Context) (Collector, error) {
+func (l *Logger) collector() (Collector, error) {
 	for _, c := range l.Collector {
-		if c.Ping(ctx) {
-			return c, nil
+		ok, err := c.Ping()
+		if !ok || err != nil {
+			fmt.Println(err)
+			l.println(fmt.Sprint("trying another collector..."))
+			continue
 		}
+
+		l.println(fmt.Sprintf("collector %T selected\n", c))
+		return c, nil
 	}
 
 	return nil, fmt.Errorf("there's no available log collector")
@@ -190,19 +177,22 @@ func (l *Logger) collector(ctx context.Context) (Collector, error) {
 
 // triggerEvents trigger events. If EventChain enabled, then the next event at the same level will run only
 // if the current event returns true.
-func (l *Logger) triggerEvents(ctx context.Context, msg string) {
+func (l *Logger) triggerEvents(msg string) {
 	if _, ok := l.Event[l.Level]; !ok {
 		return
 	}
 
-	select {
-	case <-ctx.Done():
-		return
-	default:
-		for _, event := range l.Event[l.Level] {
-			event.Fire(ctx, msg, l.Defaults)
-		}
+	for _, event := range l.Event[l.Level] {
+		event.Fire(msg, l.Defaults)
 	}
+}
+
+func (l *Logger) println(msg string) {
+	if l.SilentMode {
+		return
+	}
+
+	fmt.Println(msg)
 }
 
 func Warning(v ...interface{})                    { logInstance.log(WarningLevel, fmt.Sprint(v...)) }
