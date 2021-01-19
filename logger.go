@@ -47,6 +47,7 @@ type Logger struct {
 	Formatter  OutputFormatter
 	Event      map[LogLevel][]Event
 	Lock       bool // Not used yet
+	Timeout    time.Duration
 	SilentMode bool // if true, the verbose mode will disabled
 	mu         sync.Mutex
 }
@@ -124,7 +125,22 @@ func (l *Logger) log(level LogLevel, msg string) error {
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.handle(msg)
+
+	if l.Timeout.Seconds() == 0 {
+		return l.handle(msg)
+	}
+
+	writeDoneCh := make(chan error, 1)
+	go func() {
+		writeDoneCh <- l.handle(msg)
+	}()
+
+	select {
+	case <-time.After(l.Timeout):
+		return fmt.Errorf("logging timedout after %f seconds", l.Timeout.Seconds())
+	case err := <-writeDoneCh:
+		return err
+	}
 }
 
 // handle don't use Logger ctx directly instead uses context passed from log function
