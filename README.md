@@ -1,7 +1,7 @@
 ## Install
 
 ```console
-go get https://github.com/livingmaples/packages/logger
+GOPRIVATE=github.com/livingmaples/logger go get github.com/livingmaples/logger
 ```
 
 
@@ -18,9 +18,9 @@ Logger is a log collector solution designed to work within applications.
 
 ```go
 import (
-	"livingmaples/packages/logger"
-	"livingmaples/packages/logger/collectors"
-	"livingmaples/packages/logger/formatters"
+	"livingmaples/logger"
+	"livingmaples/logger/collectors"
+	"livingmaples/logger/formatters"
 	"time"
 )
 
