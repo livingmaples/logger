@@ -1,4 +1,4 @@
-module livingmaples/packages/logger
+module livingmaples/logger
 
 go 1.15
 

@@ -1,8 +1,8 @@
 package logger
 
 import (
-	"livingmaples/packages/logger/collectors"
-	"livingmaples/packages/logger/formatters"
+	"livingmaples/logger/collectors"
+	"livingmaples/logger/formatters"
 	"testing"
 	"time"
 )
