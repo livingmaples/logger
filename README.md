@@ -18,9 +18,9 @@ Logger is a log collector solution designed to work within applications.
 
 ```go
 import (
-	"livingmaples/logger"
-	"livingmaples/logger/collectors"
-	"livingmaples/logger/formatters"
+	"github.com/livingmaples/logger"
+	"github.com/livingmaples/logger/collectors"
+	"github.com/livingmaples/logger/formatters"
 	"time"
 )
 
