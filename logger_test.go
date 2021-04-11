@@ -1,10 +1,11 @@
 package logger
 
 import (
-	"livingmaples/logger/collectors"
-	"livingmaples/logger/formatters"
 	"testing"
 	"time"
+
+	"github.com/livingmaples/logger/collectors"
+	"github.com/livingmaples/logger/formatters"
 )
 
 func TestJsonFormatter(t *testing.T) {
